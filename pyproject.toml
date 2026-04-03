@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qrcodereader-api"
+version = "0.1.0"
+description = "FastAPI microservice for QR code detection using OpenCV WeChat QRCode."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.115,<1.0",
+  "httpx>=0.27,<1.0",
+  "numpy>=2.2,<3.0",
+  "opencv-contrib-python-headless>=4.10,<5.0",
+  "python-multipart>=0.0.9,<1.0",
+  "uvicorn[standard]>=0.32,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pillow>=11.0,<12.0",
+  "pytest>=8.3,<9.0",
+  "qrcode>=8.0,<9.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
