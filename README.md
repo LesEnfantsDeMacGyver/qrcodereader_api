@@ -2,6 +2,12 @@
 
 Dockerized FastAPI service for reading QR codes with OpenCV WeChat QRCode.
 
+Published image:
+
+```text
+ghcr.io/lesenfantsdemacgyver/qrcodereader_api:latest
+```
+
 ## Run
 
 ```bash
@@ -10,6 +16,15 @@ docker compose up -d --build
 ```
 
 Service URL: `http://localhost:8000`
+
+If you do not want to build locally, use the published image in your own compose file:
+
+```yaml
+  qrcodereader-api:
+    image: ghcr.io/lesenfantsdemacgyver/qrcodereader_api:latest
+    container_name: qrcodereader-api
+    restart: unless-stopped
+```
 
 ## Use
 
