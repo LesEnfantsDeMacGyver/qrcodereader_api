@@ -122,7 +122,12 @@ async def _read_request_image(request: Request, fetcher: URLFetcher) -> bytes:
     else:
         raw_bytes = await _read_body(request)
         if raw_bytes:
+            logger.warning(
+                "Treating unsupported content type as raw image bytes: %s",
+                content_type or "<missing>",
+            )
             return raw_bytes
+        logger.warning("Rejecting unsupported content type with empty body: %s", content_type or "<missing>")
         raise AppError("unsupported_media_type", "Unsupported content type for image input.", status_code=415)
 
     if isinstance(source, bytes):
