@@ -116,6 +116,22 @@ def test_detect_json_image_auto_detect_url(settings: Settings, sample_png_bytes:
     assert response.json()["qrcodes"][0]["text"] == "png-qr"
 
 
+def test_detect_text_plain_url(settings: Settings, sample_png_bytes: bytes) -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, content=sample_png_bytes, request=request)
+    )
+    fetcher = URLFetcher(settings, transport=transport, resolver=_public_resolver)
+    app = create_app(settings=settings, url_fetcher=fetcher)
+    with TestClient(app) as client:
+        response = client.post(
+            "/v1/qrcodes/detect",
+            content="https://example.com/qr.png",
+            headers={"content-type": "text/plain"},
+        )
+    assert response.status_code == 200
+    assert response.json()["qrcodes"][0]["text"] == "png-qr"
+
+
 def test_detect_multiple_qrcodes(client: TestClient, sample_multi_qr_bytes: bytes) -> None:
     response = client.post(
         "/v1/qrcodes/detect",

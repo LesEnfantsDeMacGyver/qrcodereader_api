@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.datastructures import UploadFile
+from starlette.requests import ClientDisconnect
 
 from app.config import Settings
 from app.detector import QRCodeDetectorService
@@ -70,27 +71,56 @@ def _extract_json_source(payload: dict[str, Any]) -> str:
     raise AppError("invalid_request", "Provide one of image, url, base64, or data_url.", status_code=400)
 
 
+async def _read_body(request: Request) -> bytes:
+    try:
+        return await request.body()
+    except ClientDisconnect as exc:
+        raise AppError(
+            "client_disconnected",
+            "The client disconnected before the request body could be read.",
+            status_code=400,
+        ) from exc
+
+
 async def _read_request_image(request: Request, fetcher: URLFetcher) -> bytes:
     content_type = request.headers.get("content-type", "")
 
     if "multipart/form-data" in content_type or "application/x-www-form-urlencoded" in content_type:
-        form_data = await request.form()
+        try:
+            form_data = await request.form()
+        except ClientDisconnect as exc:
+            raise AppError(
+                "client_disconnected",
+                "The client disconnected before the form data could be read.",
+                status_code=400,
+            ) from exc
         source = await _extract_form_image(form_data)
     elif "application/json" in content_type or not content_type:
         try:
             payload = await request.json()
         except json.JSONDecodeError as exc:
             raise AppError("invalid_request", "Request body must be valid JSON, multipart form data, or raw image bytes.", status_code=400) from exc
+        except ClientDisconnect as exc:
+            raise AppError(
+                "client_disconnected",
+                "The client disconnected before the JSON body could be read.",
+                status_code=400,
+            ) from exc
         if not isinstance(payload, dict):
             raise AppError("invalid_request", "JSON request body must be an object.", status_code=400)
         source = _extract_json_source(payload)
     elif content_type.startswith("image/") or "application/octet-stream" in content_type:
-        raw_bytes = await request.body()
+        raw_bytes = await _read_body(request)
         if not raw_bytes:
             raise AppError("invalid_request", "Request body did not contain image bytes.", status_code=400)
         return raw_bytes
+    elif content_type.startswith("text/plain"):
+        raw_text = (await _read_body(request)).decode("utf-8", errors="replace").strip()
+        if not raw_text:
+            raise AppError("invalid_request", "Request body did not contain image input.", status_code=400)
+        source = raw_text
     else:
-        raw_bytes = await request.body()
+        raw_bytes = await _read_body(request)
         if raw_bytes:
             return raw_bytes
         raise AppError("unsupported_media_type", "Unsupported content type for image input.", status_code=415)
