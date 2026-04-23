@@ -28,6 +28,15 @@ def _make_multi_qr_image(texts: list[str]) -> bytes:
     return buffer.getvalue()
 
 
+def _make_large_camera_like_qr_image() -> bytes:
+    qr_image = qrcode.make("large-jpeg-qr").convert("RGB").resize((260, 260))
+    canvas = Image.new("RGB", (3600, 2600), color="white")
+    canvas.paste(qr_image, (2850, 1850))
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="JPEG", quality=92)
+    return buffer.getvalue()
+
+
 @pytest.fixture(scope="session")
 def sample_png_bytes() -> bytes:
     return _make_qr_image("png-qr", image_format="PNG")
@@ -41,6 +50,11 @@ def sample_jpeg_bytes() -> bytes:
 @pytest.fixture(scope="session")
 def sample_multi_qr_bytes() -> bytes:
     return _make_multi_qr_image(["left-qr", "right-qr"])
+
+
+@pytest.fixture(scope="session")
+def large_camera_like_qr_bytes() -> bytes:
+    return _make_large_camera_like_qr_image()
 
 
 @pytest.fixture(scope="session")

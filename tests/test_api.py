@@ -143,6 +143,18 @@ def test_detect_multiple_qrcodes(client: TestClient, sample_multi_qr_bytes: byte
     assert texts == ["left-qr", "right-qr"]
 
 
+def test_detect_large_camera_like_jpeg(client: TestClient, large_camera_like_qr_bytes: bytes) -> None:
+    response = client.post(
+        "/v1/qrcodes/detect",
+        content=large_camera_like_qr_bytes,
+        headers={"content-type": "image/jpeg"},
+    )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["count"] == 1
+    assert body["qrcodes"][0]["text"] == "large-jpeg-qr"
+
+
 def test_detect_no_qrcodes_returns_empty_list(client: TestClient, blank_png_bytes: bytes) -> None:
     response = client.post(
         "/v1/qrcodes/detect",
