@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import multiprocessing as mp
+import queue
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -90,6 +92,48 @@ class QRCodeDetectorService:
             for index, text in enumerate(texts)
         ]
 
+    def detect_isolated(self, image_bytes: bytes, timeout_seconds: float) -> list[Detection]:
+        if self._detector is None:
+            raise AppError("service_unavailable", "The QR detector is not ready.", status_code=503)
+
+        context = mp.get_context("spawn")
+        result_queue = context.Queue(maxsize=1)
+        process = context.Process(
+            target=_detect_in_child_process,
+            args=(str(self.model_dir), image_bytes, result_queue),
+        )
+        process.start()
+        process.join(timeout_seconds)
+
+        if process.is_alive():
+            process.terminate()
+            process.join(2)
+            if process.is_alive():
+                process.kill()
+                process.join(2)
+            result_queue.close()
+            result_queue.join_thread()
+            raise AppError(
+                "detection_timeout",
+                "QR detection exceeded the configured timeout.",
+                status_code=504,
+            )
+
+        try:
+            result = result_queue.get_nowait()
+        except queue.Empty as exc:
+            raise AppError("detector_failed", "QR detection failed before returning a result.", status_code=500) from exc
+        finally:
+            result_queue.close()
+            result_queue.join_thread()
+
+        status = result.get("status")
+        if status == "ok":
+            return [Detection(text=item["text"], points=item["points"]) for item in result["detections"]]
+        if status == "app_error":
+            raise AppError(result["code"], result["message"], result["status_code"])
+        raise AppError("detector_failed", result.get("message", "QR detection failed."), status_code=500)
+
 
 def decode_image_bytes(image_bytes: bytes) -> np.ndarray:
     if not image_bytes:
@@ -100,3 +144,28 @@ def decode_image_bytes(image_bytes: bytes) -> np.ndarray:
     if image is None:
         raise AppError("invalid_image", "Could not decode an image from the provided input.", status_code=400)
     return image
+
+
+def _detect_in_child_process(model_dir: str, image_bytes: bytes, result_queue: Any) -> None:
+    try:
+        detector = create_wechat_detector(Path(model_dir))
+        image = decode_image_bytes(image_bytes)
+        texts, points = detector.detectAndDecode(image)
+        detections = []
+        if texts:
+            detections = [
+                {"text": text, "points": _normalize_points(points, index)}
+                for index, text in enumerate(texts)
+            ]
+        result_queue.put({"status": "ok", "detections": detections})
+    except AppError as exc:
+        result_queue.put(
+            {
+                "status": "app_error",
+                "code": exc.code,
+                "message": exc.message,
+                "status_code": exc.status_code,
+            }
+        )
+    except Exception as exc:  # pragma: no cover - defensive child-process boundary
+        result_queue.put({"status": "error", "message": str(exc)})

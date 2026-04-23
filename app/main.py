@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import asyncio
 import json
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -198,13 +201,48 @@ def create_app(
             400: {"model": ErrorResponse},
             413: {"model": ErrorResponse},
             415: {"model": ErrorResponse},
+            500: {"model": ErrorResponse},
+            504: {"model": ErrorResponse},
             503: {"model": ErrorResponse},
         },
     )
     async def detect(request: Request) -> DetectResponse:
+        request_id = uuid.uuid4().hex[:12]
+        started_at = time.perf_counter()
+        content_type = request.headers.get("content-type", "<missing>")
+        content_length = request.headers.get("content-length", "<missing>")
+        logger.info(
+            "QR detect request started id=%s content_type=%s content_length=%s",
+            request_id,
+            content_type,
+            content_length,
+        )
         image_bytes = await _read_request_image(request, url_fetcher)
-        detections = detector_service.detect(image_bytes)
+        try:
+            detections = await asyncio.to_thread(
+                detector_service.detect_isolated,
+                image_bytes,
+                settings.detection_timeout_seconds,
+            )
+        except AppError as exc:
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            logger.warning(
+                "QR detect request failed id=%s code=%s status=%s elapsed_ms=%s",
+                request_id,
+                exc.code,
+                exc.status_code,
+                elapsed_ms,
+            )
+            raise
+
         results = [QRCodeResult(text=item.text, points=item.points) for item in detections]
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.info(
+            "QR detect request completed id=%s count=%s elapsed_ms=%s",
+            request_id,
+            len(results),
+            elapsed_ms,
+        )
         return DetectResponse(count=len(results), qrcodes=results)
 
     return app

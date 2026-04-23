@@ -16,6 +16,7 @@ def test_readyz_reports_missing_models(tmp_path) -> None:
         model_dir=tmp_path,
         max_image_bytes=10 * 1024 * 1024,
         url_fetch_timeout_seconds=10,
+        detection_timeout_seconds=30,
         allow_private_urls=False,
         log_level="INFO",
     )
@@ -32,6 +33,7 @@ def test_readyz_reports_ready_with_repo_models() -> None:
         model_dir=ROOT_DIR / "models",
         max_image_bytes=10 * 1024 * 1024,
         url_fetch_timeout_seconds=10,
+        detection_timeout_seconds=30,
         allow_private_urls=False,
         log_level="INFO",
     )
