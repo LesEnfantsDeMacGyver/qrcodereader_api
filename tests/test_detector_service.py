@@ -17,6 +17,7 @@ def test_readyz_reports_missing_models(tmp_path) -> None:
         max_image_bytes=10 * 1024 * 1024,
         url_fetch_timeout_seconds=10,
         detection_timeout_seconds=30,
+        max_concurrent_detections=1,
         allow_private_urls=False,
         log_level="INFO",
     )
@@ -34,6 +35,7 @@ def test_readyz_reports_ready_with_repo_models() -> None:
         max_image_bytes=10 * 1024 * 1024,
         url_fetch_timeout_seconds=10,
         detection_timeout_seconds=30,
+        max_concurrent_detections=1,
         allow_private_urls=False,
         log_level="INFO",
     )

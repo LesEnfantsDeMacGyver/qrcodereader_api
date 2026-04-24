@@ -20,6 +20,7 @@ def _settings() -> Settings:
         max_image_bytes=10 * 1024 * 1024,
         url_fetch_timeout_seconds=10,
         detection_timeout_seconds=30,
+        max_concurrent_detections=1,
         allow_private_urls=False,
         log_level="INFO",
     )

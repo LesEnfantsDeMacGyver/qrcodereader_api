@@ -17,6 +17,7 @@ class Settings:
     max_image_bytes: int
     url_fetch_timeout_seconds: float
     detection_timeout_seconds: float
+    max_concurrent_detections: int
     allow_private_urls: bool
     log_level: str
 
@@ -29,6 +30,7 @@ class Settings:
             max_image_bytes=int(os.getenv("MAX_IMAGE_BYTES", "10485760")),
             url_fetch_timeout_seconds=float(os.getenv("URL_FETCH_TIMEOUT_SECONDS", "10")),
             detection_timeout_seconds=float(os.getenv("DETECTION_TIMEOUT_SECONDS", "30")),
+            max_concurrent_detections=int(os.getenv("MAX_CONCURRENT_DETECTIONS", "1")),
             allow_private_urls=_parse_bool(os.getenv("ALLOW_PRIVATE_URLS"), default=False),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
         )

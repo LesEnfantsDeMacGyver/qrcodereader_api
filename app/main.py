@@ -173,6 +173,7 @@ def create_app(
     app.state.settings = settings
     app.state.detector_service = detector_service
     app.state.url_fetcher = url_fetcher
+    app.state.detection_semaphore = asyncio.Semaphore(settings.max_concurrent_detections)
 
     @app.exception_handler(AppError)
     async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
@@ -201,6 +202,7 @@ def create_app(
             400: {"model": ErrorResponse},
             413: {"model": ErrorResponse},
             415: {"model": ErrorResponse},
+            429: {"model": ErrorResponse},
             500: {"model": ErrorResponse},
             504: {"model": ErrorResponse},
             503: {"model": ErrorResponse},
@@ -218,12 +220,27 @@ def create_app(
             content_length,
         )
         image_bytes = await _read_request_image(request, url_fetcher)
-        try:
-            detections = await asyncio.to_thread(
-                detector_service.detect_isolated,
-                image_bytes,
-                settings.detection_timeout_seconds,
+        semaphore: asyncio.Semaphore = request.app.state.detection_semaphore
+        if semaphore.locked():
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            logger.warning(
+                "QR detect request rejected id=%s code=detection_busy status=429 elapsed_ms=%s",
+                request_id,
+                elapsed_ms,
             )
+            raise AppError(
+                "detection_busy",
+                "QR detection is already processing another request.",
+                status_code=429,
+            )
+
+        try:
+            async with semaphore:
+                detections = await asyncio.to_thread(
+                    detector_service.detect_isolated,
+                    image_bytes,
+                    settings.detection_timeout_seconds,
+                )
         except AppError as exc:
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)
             logger.warning(

@@ -63,6 +63,8 @@ Response shape:
 }
 ```
 
+Large images can take time to scan. The service runs one detection at a time by default and returns `429 detection_busy` if another request arrives while a scan is active.
+
 ## Stop
 
 ```bash
