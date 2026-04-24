@@ -113,7 +113,7 @@ def _iter_scan_regions(image: np.ndarray):
 
 def _detect_multiscale(detector: cv2.wechat_qrcode.WeChatQRCode, image: np.ndarray) -> list[Detection]:
     detections: list[Detection] = []
-    for scan_image, x_offset, y_offset, scale in _iter_scan_regions(image):
+    for region_index, (scan_image, x_offset, y_offset, scale) in enumerate(_iter_scan_regions(image)):
         texts, points = detector.detectAndDecode(scan_image)
         if not texts:
             continue
@@ -121,6 +121,8 @@ def _detect_multiscale(detector: cv2.wechat_qrcode.WeChatQRCode, image: np.ndarr
             local_points = _normalize_points(points, index)
             original_points = _scale_points(local_points, scale, x_offset, y_offset)
             _add_detection(detections, text, original_points)
+        if region_index == 0 and detections:
+            return detections
     return detections
 
 
